@@ -1,19 +1,25 @@
 import json
 
-# In reality, you would import 'scholarly' here and fetch data
-# For now, this script ensures the format matches what React expects.
-
+# Placeholder logic. Update this with real scraping logic (e.g. SerpAPI) later.
 data = [
-    {
-        "title": "Real-time Data Analysis in Python",
-        "authors": "M Mohsin",
-        "journal": "Dalhousie CS Journal",
-        "citations": 5,
-        "year": "2025",
-        "link": "https://scholar.google.com/citations?user=L6Esq54AAAAJ&hl=en"
-    },
-    # Add logic here to fetch real data
+  {
+    "title": "Deep Learning Approaches for Medical Image Segmentation",
+    "authors": "M. Mohsin, Co-Author A",
+    "venue": "Journal of Medical Imaging",
+    "year": 2024,
+    "citations": 15,
+    "url": "#"
+  },
+  {
+    "title": "Trustworthy AI in Healthcare",
+    "authors": "M. Mohsin, Co-Author B",
+    "venue": "International Conference on AI",
+    "year": 2023,
+    "citations": 8,
+    "url": "#"
+  }
 ]
 
 with open('public/scholar.json', 'w') as f:
     json.dump(data, f)
+    print("Updated public/scholar.json")

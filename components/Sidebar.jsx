@@ -1,64 +1,106 @@
-import Image from 'next/image';
-import { FaGithub, FaLinkedin, FaGraduationCap, FaOrcid } from 'react-icons/fa';
-import { motion } from 'framer-motion';
+import React from 'react';
+import { Moon, Sun, ExternalLink, Mail, BookOpen, FileText, Award } from 'lucide-react';
 
-const Sidebar = () => {
+const Sidebar = ({ darkMode, setDarkMode, activeSection, scrollToSection }) => {
+  
   const navItems = [
-    { name: 'About', id: 'about' },
-    { name: 'Publications', id: 'publications' },
-    { name: 'Unpublished Works', id: 'unpublished' },
-    { name: 'Research Interests', id: 'interests' },
+    { id: 'about', label: 'About', icon: BookOpen },
+    { id: 'publications', label: 'Publications', icon: FileText },
+    { id: 'unpublished', label: 'Unpublished Works', icon: Award },
+    { id: 'contact', label: 'Contact', icon: Mail }
   ];
 
   return (
-    <motion.aside 
-      initial={{ x: -100, opacity: 0 }}
-      animate={{ x: 0, opacity: 1 }}
-      className="fixed left-0 top-0 h-screen w-80 bg-pastel-card dark:bg-dark-card shadow-lg p-8 flex flex-col justify-between z-50 transition-colors duration-500"
-    >
-      <div className="flex flex-col items-center">
-        {/* Profile Image */}
-        <div className="relative w-40 h-40 mb-6 rounded-full overflow-hidden border-4 border-pastel-accent dark:border-dark-accent shadow-md">
-           {/* Replace '/profile.jpg' with your actual image in the public folder */}
-          <Image src="/profile.jpg" alt="Mubashir Mohsin" fill className="object-cover" />
-        </div>
-        
-        <h1 className="text-2xl font-bold mb-1">Mubashir Mohsin</h1>
-        <p className="text-sm text-center opacity-80 mb-6 italic">
-          Master of Computer Science @ Dalhousie <br/>
-          AI • Healthcare • Privacy
-        </p>
+    <aside className={`fixed left-0 top-0 h-full w-80 transition-all duration-700 ${
+        darkMode 
+          ? 'bg-slate-800/80 backdrop-blur-xl border-r border-slate-700/50' 
+          : 'bg-white/80 backdrop-blur-xl border-r border-purple-200/50'
+      } shadow-2xl z-50 hidden md:block`}>
+        <div className="flex flex-col h-full p-8">
+          
+          {/* Profile Image */}
+          <div className="flex justify-center mb-6">
+            <div className={`relative w-36 h-36 rounded-full p-1 transition-all duration-500 ${
+              darkMode 
+                ? 'bg-gradient-to-br from-indigo-500 to-purple-600' 
+                : 'bg-gradient-to-br from-rose-400 to-purple-400'
+            } shadow-lg`}>
+              {/* Ensure profile.jpg is in your public folder */}
+              <img
+                src="/profile.jpg" 
+                alt="Mubashir Mohsin"
+                className="w-full h-full rounded-full object-cover border-4 border-white/20"
+              />
+            </div>
+          </div>
 
-        {/* Social Links */}
-        <div className="flex gap-4 mb-8 text-xl text-pastel-accent dark:text-dark-accent">
-          <a href="https://github.com/Mubashir42884" target="_blank" className="hover:scale-110 transition-transform"><FaGithub /></a>
-          <a href="https://linkedin.com/in/Mubashir-Mohsin" target="_blank" className="hover:scale-110 transition-transform"><FaLinkedin /></a>
-          <a href="#" target="_blank" className="hover:scale-110 transition-transform"><FaGraduationCap /></a>
-          <a href="#" target="_blank" className="hover:scale-110 transition-transform"><FaOrcid /></a>
-        </div>
+          {/* Name */}
+          <div className="text-center mb-6">
+            <h1 className={`text-2xl font-serif font-bold mb-2 transition-colors duration-500 ${
+              darkMode ? 'text-slate-100' : 'text-slate-800'
+            }`}>
+              Mubashir Mohsin
+            </h1>
+            <p className={`text-sm font-serif transition-colors duration-500 ${
+              darkMode ? 'text-slate-400' : 'text-slate-600'
+            }`}>
+              Master's Student • Research Enthusiast
+            </p>
+          </div>
 
-        {/* Navigation */}
-        <nav className="w-full">
-          <ul className="space-y-4">
-            {navItems.map((item) => (
-              <li key={item.id}>
-                <a 
-                  href={`#${item.id}`} 
-                  className="block text-lg hover:text-pastel-accent dark:hover:text-dark-accent cursor-pointer transition-colors"
-                >
-                  {item.name}
-                </a>
-              </li>
+          {/* Theme Toggle Button */}
+          <div className="flex justify-center mb-6">
+            <button
+              onClick={() => setDarkMode(!darkMode)}
+              className={`relative w-16 h-8 rounded-full transition-all duration-500 ${
+                darkMode ? 'bg-indigo-900' : 'bg-amber-200'
+              } shadow-inner`}
+              aria-label="Toggle theme"
+            >
+              <div className={`absolute top-1 left-1 w-6 h-6 rounded-full transition-all duration-500 transform ${
+                  darkMode ? 'translate-x-8 bg-slate-700' : 'translate-x-0 bg-amber-400'
+                } flex items-center justify-center shadow-md`}>
+                {darkMode ? <Moon className="w-4 h-4 text-indigo-200" /> : <Sun className="w-4 h-4 text-amber-700" />}
+              </div>
+            </button>
+          </div>
+
+          {/* Navigation Links */}
+          <nav className="flex-1 space-y-2">
+            {navItems.map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                onClick={() => scrollToSection(id)}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 font-serif ${
+                  activeSection === id
+                    ? darkMode
+                      ? 'bg-indigo-600/30 text-indigo-300 shadow-lg'
+                      : 'bg-purple-200/50 text-purple-700 shadow-md'
+                    : darkMode
+                    ? 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-200'
+                    : 'text-slate-600 hover:bg-purple-100/50 hover:text-purple-700'
+                }`}
+              >
+                <Icon className="w-5 h-5" />
+                <span>{label}</span>
+              </button>
             ))}
-          </ul>
-        </nav>
-      </div>
+          </nav>
 
-      <div className="text-xs text-center opacity-50">
-        &copy; {new Date().getFullYear()} Mubashir Mohsin
-      </div>
-    </motion.aside>
+          {/* External Links */}
+          <div className="mt-6 pt-6 border-t border-slate-300/20">
+            <div className="flex justify-center gap-4">
+              {['Scholar', 'LinkedIn', 'GitHub'].map((platform) => (
+                <a key={platform} href="#" className={`transition-all duration-300 ${
+                    darkMode ? 'text-slate-400 hover:text-indigo-400' : 'text-slate-600 hover:text-purple-600'
+                  } hover:scale-110`}>
+                  <ExternalLink className="w-5 h-5" />
+                </a>
+              ))}
+            </div>
+          </div>
+        </div>
+      </aside>
   );
 };
-
 export default Sidebar;

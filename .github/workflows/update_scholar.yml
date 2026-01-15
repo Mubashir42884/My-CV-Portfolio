@@ -1,8 +1,10 @@
 name: Update Scholar Data
+
 on:
   schedule:
-    - cron: '0 0 * * *' # Runs every day at midnight UTC
-  workflow_dispatch:      # Allows you to click "Run Now" manually
+    # Run once per week (every Monday at 2 AM UTC) to reduce rate limiting
+    - cron: '0 2 * * 1'
+  workflow_dispatch: # Allows you to click "Run Now" manually
 
 permissions:
   contents: write
@@ -10,8 +12,10 @@ permissions:
 jobs:
   update-scholar:
     runs-on: ubuntu-latest
+    
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v3
       
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -21,14 +25,56 @@ jobs:
       - name: Install Dependencies
         run: |
           pip install scholarly
+          pip install free-proxy
           
       - name: Run Scraper Script
-        run: python scripts/fetch_scholar.py
-        
-      - name: Commit and Push
+        id: scraper
+        continue-on-error: true
         run: |
-          git config --global user.name 'GitHub Action'
-          git config --global user.email 'action@github.com'
-          # Only commit if scholar.json actually changed
+          echo "Starting Scholar data fetch..."
+          python scripts/fetch_scholar.py
+        
+      - name: Check for changes
+        id: check_changes
+        run: |
+          if git diff --quiet public/scholar.json; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "No changes detected in scholar.json"
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "Changes detected in scholar.json"
+          fi
+        
+      - name: Commit and Push Changes
+        if: steps.check_changes.outputs.changed == 'true'
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           git add public/scholar.json
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update scholar data" && git push)
+          git commit -m "🤖 Auto-update: Scholar publications data [skip ci]"
+          git push
+          echo "✓ Changes committed and pushed successfully"
+      
+      - name: No changes to commit
+        if: steps.check_changes.outputs.changed == 'false'
+        run: |
+          echo "ℹ️ No updates needed - scholar.json is already up to date"
+      
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Scholar Update Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.scraper.outcome }}" == "success" ]; then
+            echo "✅ **Scraper Status:** Success" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ **Scraper Status:** Failed (existing data preserved)" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.check_changes.outputs.changed }}" == "true" ]; then
+            echo "📝 **Changes:** New data committed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "📝 **Changes:** No updates needed" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Next scheduled run:** Next Monday at 2 AM UTC" >> $GITHUB_STEP_SUMMARY

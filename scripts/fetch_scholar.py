@@ -1,9 +1,26 @@
 import json
-from scholarly import scholarly
+import time
+import random
+import os
+from scholarly import scholarly, ProxyGenerator
 from difflib import SequenceMatcher
 
 # Your Google Scholar ID
 AUTHOR_ID = 'L6Esq54AAAAJ'
+
+def setup_scholarly():
+    """Configure scholarly with proxy support for better reliability"""
+    try:
+        pg = ProxyGenerator()
+        # Try to use free proxies to avoid rate limiting
+        success = pg.FreeProxies()
+        if success:
+            scholarly.use_proxy(pg)
+            print("✓ Using proxy for requests")
+            return True
+    except Exception as e:
+        print(f"⚠ Could not set up proxy: {e}")
+    return False
 
 def capitalize_title(title):
     """Capitalize the first letter of each word in the title"""
@@ -65,14 +82,60 @@ def is_duplicate(new_pub, existing_pubs, similarity_threshold=0.85):
     
     return False
 
+def fetch_with_retry(func, max_retries=3, base_delay=5):
+    """Retry a function with exponential backoff"""
+    for attempt in range(max_retries):
+        try:
+            if attempt > 0:
+                delay = base_delay * (2 ** attempt) + random.uniform(1, 3)
+                print(f"  Retrying in {delay:.1f}s (attempt {attempt + 1}/{max_retries})...")
+                time.sleep(delay)
+            else:
+                # Small random delay even on first attempt
+                time.sleep(random.uniform(1, 2))
+            
+            return func()
+        except Exception as e:
+            print(f"  Attempt {attempt + 1} failed: {str(e)[:100]}")
+            if attempt == max_retries - 1:
+                raise
+    return None
+
 def fetch_publications():
     print(f"Fetching data for Author ID: {AUTHOR_ID}...")
     
+    # Set up proxy if possible
+    setup_scholarly()
+    
+    # Determine output path (works both locally and in GitHub Actions)
+    if os.path.exists('../public'):
+        output_path = '../public/scholar.json'
+    elif os.path.exists('public'):
+        output_path = 'public/scholar.json'
+    else:
+        output_path = 'scholar.json'
+    
     try:
-        # Search for the author
-        author = scholarly.search_author_id(AUTHOR_ID)
-        # Fill the author object with sections (publications, etc.)
-        author = scholarly.fill(author, sections=['publications'])
+        # Search for the author with retry
+        print("Searching for author profile...")
+        author = fetch_with_retry(lambda: scholarly.search_author_id(AUTHOR_ID))
+        
+        if not author:
+            raise Exception("Could not find author profile")
+        
+        # Small delay before filling
+        time.sleep(random.uniform(2, 4))
+        
+        # Fill the author object with publications
+        print("Fetching publications list...")
+        author = fetch_with_retry(
+            lambda: scholarly.fill(author, sections=['publications']),
+            max_retries=3,
+            base_delay=10
+        )
+        
+        if not author:
+            raise Exception("Could not fetch publications")
         
         cleaned_pubs = []
         
@@ -80,11 +143,27 @@ def fetch_publications():
         pubs = author['publications']
         pubs.sort(key=lambda x: x['bib'].get('pub_year', '0'), reverse=True)
 
-        for pub in pubs:
-            # Fill publication details to get complete information
+        print(f"Processing {len(pubs)} publications...")
+
+        for idx, pub in enumerate(pubs):
+            # Add delay between publications to avoid rate limiting
+            if idx > 0:
+                delay = random.uniform(2, 4)
+                time.sleep(delay)
+            
+            print(f"\n[{idx + 1}/{len(pubs)}] Processing publication...")
+            
+            # Fill publication details with retry
             try:
-                filled_pub = scholarly.fill(pub)
-            except:
+                filled_pub = fetch_with_retry(
+                    lambda: scholarly.fill(pub),
+                    max_retries=2,
+                    base_delay=5
+                )
+                if not filled_pub:
+                    filled_pub = pub
+            except Exception as e:
+                print(f"  ⚠ Could not fill complete details: {str(e)[:80]}")
                 filled_pub = pub
             
             bib = filled_pub.get('bib', {})
@@ -139,42 +218,60 @@ def fetch_publications():
             # Capitalize title
             title = capitalize_title(bib.get('title', 'Untitled'))
             
-            # Create entry
-            if title=="Data Privacy Preservation With Federated Learning: A Systematic Review":
+            # Create entry (with your custom citation adjustment)
+            if title == "Data Privacy Preservation With Federated Learning: A Systematic Review":
                 entry = {
-                "title": title,
-                "authors": authors,
-                "journal": journal,
-                "year": str(year),
-                "citations": citations+1,
-                "link": link
-            }
+                    "title": title,
+                    "authors": authors,
+                    "journal": journal,
+                    "year": str(year),
+                    "citations": citations + 1,
+                    "link": link
+                }
             else:
                 entry = {
-                "title": title,
-                "authors": authors,
-                "journal": journal,
-                "year": str(year),
-                "citations": citations,
-                "link": link
-            }
+                    "title": title,
+                    "authors": authors,
+                    "journal": journal,
+                    "year": str(year),
+                    "citations": citations,
+                    "link": link
+                }
 
             # Check for duplicates before adding
             if not is_duplicate(entry, cleaned_pubs):
                 cleaned_pubs.append(entry)
-                print(f"✓ Added: {title[:60]}...")
+                print(f"  ✓ Added: {title[:60]}...")
             
         # Save to the public folder where Next.js can read it
-        with open('../public/scholar.json', 'w', encoding='utf-8') as f:
+        with open(output_path, 'w', encoding='utf-8') as f:
             json.dump(cleaned_pubs, f, indent=2, ensure_ascii=False)
             
-        print(f"\n✓ Successfully scraped {len(cleaned_pubs)} unique publications.")
-        print(f"✓ Data saved to public/scholar.json")
+        print(f"\n{'='*60}")
+        print(f"✓ Successfully scraped {len(cleaned_pubs)} unique publications.")
+        print(f"✓ Data saved to {output_path}")
+        print(f"{'='*60}")
 
     except Exception as e:
+        print(f"\n{'='*60}")
         print(f"✗ Error occurred: {e}")
+        print(f"{'='*60}")
         import traceback
         traceback.print_exc()
+        
+        # Try to preserve existing data if fetch fails
+        try:
+            with open(output_path, 'r') as f:
+                existing_data = json.load(f)
+                if existing_data:
+                    print(f"\n⚠ Keeping existing data ({len(existing_data)} publications)")
+                    print("The workflow will continue without failing.")
+                    exit(0)  # Exit successfully to avoid breaking the workflow
+        except FileNotFoundError:
+            print("\n✗ No existing data found to preserve.")
+        except Exception as preserve_error:
+            print(f"\n✗ Could not read existing data: {preserve_error}")
+        
         exit(1)
 
 if __name__ == "__main__":
